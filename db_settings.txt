@@ -1,0 +1,4 @@
+host=localhost
+database=dns
+user=postgres
+password=1111
