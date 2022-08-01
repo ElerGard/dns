@@ -3,65 +3,82 @@ import pandas as pd
 import plotly
 import psycopg2
 import time
+from pyparsing import col
+from sqlalchemy import create_engine
 
-try:
-    f = open('db_settings.txt', 'r')
-    db_setting = {}
-    for st in f:
-        data = st.replace(" ", "").replace("\n", "").lower().split('=')
-        db_setting[data[0]] = data[1]
-
-except OSError:
-    print(f"Файл с настройками базы данных не найден. Установлены настройки по умолчанию")
-    db_setting = {'host':'localhost', 'database': 'dns', 'user': 'postgres', 'password': '1111'}
-    print(db_setting)
-    
 try:
     conn = psycopg2.connect(
-        host=db_setting['host'],
-        database=db_setting['database'],
-        user=db_setting['user'],
-        password=db_setting['password'])
+        host='localhost',
+        database='dns',
+        user='postgres',
+        password='1111'
+    )
     
 except psycopg2.OperationalError:
-    print("Не удалось подключиться к базе данных. Проверьте файл настроек")
+    print("Не удалось подключиться к базе данных")
     exit()
 
+queries = (
+    '''CREATE TABLE IF NOT EXISTS cities (
+            Индекс int, 
+            Ссылка varchar(60),
+            Наименование varchar(60)
+        );
+    ''',
+    '''CREATE TABLE IF NOT EXISTS products (
+            Индекс int, 
+            Ссылка varchar(60),
+            Наименование varchar(60)
+        );
+    ''',
+    '''CREATE TABLE IF NOT EXISTS sales (
+            Индекс int, 
+            Период timestamp,
+            Филиал varchar(60),
+            Номенклатура varchar(60),
+            Количество real,
+            Продажа real
+        );
+    ''',
+    '''CREATE TABLE IF NOT EXISTS branches (
+            Индекс int, 
+            Ссылка varchar(60),
+            Наименование varchar(60),
+            Город varchar(60),
+            КраткоеНаименование varchar(60),
+            Регион varchar(60)
+        );
+    '''
+)
+
+cursor = conn.cursor()
+for query in queries:
+    cursor.execute(query)
+cursor.close()
+conn.commit()
+
+# conn_string = 'postgresql://postgres:1111@localhost/dns'
+  
+# db = create_engine(conn_string)
+# conn2 = db.connect()
+
+# files = ['products', 'cities', 'branches', 'sales']
+# st = time.time()
+# for filename in files:
+#     df = pd.read_csv(f't_{filename}.csv', sep=',')
+#     df = df.rename(columns={'Unnamed: 0': 'Индекс'})
+#     df.to_sql(filename, con=conn2, if_exists='replace',index=False)
+# et = time.time()
+# ts = st - et
+
 # Не совсем понял как отличать магазины и склады. 
-# За склады считал все строки где есть слово склад в Наименовании или Кратком наименовании, остально как магазины
-st = time.time()
-df_sales = pd.read_csv('t_sales.csv', sep=",")
-et = time.time()
-elapsed_time = et - st
-print('Execution time:', elapsed_time, 'seconds')
-df_sales = df_sales.rename(columns={'Unnamed: 0': 'index', 
-                                    "Период": 'period', 
-                                    "Филиал": "link",
-                                    'Номенклатура': 'nomenclature', 
-                                    'Количество': 'amount', 
-                                    'Продажа': 'sales'})
-
-df_branches = pd.read_csv('t_branches.csv', sep=",", encoding='utf-8')
-df_branches = df_branches.rename(columns={'Unnamed: 0': 'index', 
-                                          "Ссылка": 'link', 
-                                          "Наименование": "name", 
-                                          'Город': 'city', 
-                                          'КраткоеНаименование': 'short_name', 
-                                          'Регион': 'region'})
-
-df_branches.short_name = df_branches.short_name.fillna("") # для того чтобы не получить exception при обработке
-df_storages = df_branches[df_branches.short_name.str.contains("склад", case=False)]
-df_storages_sales = df_sales \
-                        .groupby(['link'], as_index=False) \
-                        .aggregate({'amount': 'sum'}) \
-                            
-df_storages_sales = df_storages \
-                        .merge(df_storages_sales, how='inner', on='link') \
-                        .sort_values('amount', ascending=False) 
-                        
-print(df_storages_sales)
-print(df_storages)
-
+# За склады считал все строки где есть слово склад в Кратком наименовании, остально как магазины
+query = '''Select * From branches Where position('склад' in lower(КраткоеНаименование)) > 0'''
+cursor = conn.cursor()
+cursor.execute(query)
+row = cursor.fetchall()
+print(row)
+cursor.close()
 
 def first_task():
     pass
@@ -71,3 +88,5 @@ def second_task():
 
 def third_task():
     pass
+
+conn.close()
