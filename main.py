@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 def inser_csv_to_db(files: list, conn, conn_sqlalchemy) -> None:
     
     # Запросы на создание таблиц
+    # Первичные и вторичные ключи не настраивал так как не было чётких критериев на этот счёт
     queries_tables = (
         '''CREATE TABLE IF NOT EXISTS cities (
                 Индекс int, 
@@ -147,13 +148,9 @@ def first_part(conn_sqlalchemy) -> None:
     # Функция для выполнения заданий по запросам
     def do_task(sql_query: str, i: int) -> pd.DataFrame:
         st = time()
-        # Разницы по времени выполнения нету
-        # cursor = conn.cursor()
-        # cursor.execute(sql_query)
-        # df = cursor.fetchall()
-        # cursor.close()
         df = pd.read_sql_query(sql_query, conn_sqlalchemy)
         et = time()
+        # Сделал принт df тут для более удобной читаемости при проверке
         print(df)
         print(f"Время выполнения задания {i} - {et - st}\n")
         return df
