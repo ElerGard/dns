@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-import plotly
+import plotly.express as px
 import psycopg2
 import time
 from pyparsing import col
@@ -122,6 +122,21 @@ query25 = '''With to_select As (
             JOIN cities ON Город = cities.Ссылка
             LIMIT 10
         '''
+task2 = '''With test as (
+                SELECT
+                EXTRACT (DOW FROM CAST(Период as timestamp)) AS ДеньНедели,
+                EXTRACT (HOUR FROM CAST(Период as timestamp)) AS ЧасДня,
+                Sum(Количество) as КоличествоПродаж
+                FROM
+                    sales
+                GROUP BY ДеньНедели, ЧасДня
+            ), max_sales as (
+                Select ДеньНедели, Max(КоличествоПродаж) as МаксимальноПродаж from test
+                GROUP BY ДеньНедели
+            )
+            Select max_sales.ДеньНедели, test.ЧасДня, МаксимальноПродаж from max_sales
+            JOIN test ON МаксимальноПродаж = КоличествоПродаж
+        '''
 cursor = conn.cursor()
 for query in queries:
     cursor.execute(query)
@@ -144,74 +159,35 @@ conn2 = db.connect()
 
 # Не совсем понял как отличать магазины и склады. 
 # За склады считал все строки где есть слово склад в Кратком наименовании, остально как магазины
-query1 = '''With storages_sales As (
-                Select Ссылка, Наименование From branches Where (position('склад' in lower(КраткоеНаименование)) > 0)
-            )
-            Select Наименование, SUM(Количество) As Количество_продаж From storages_sales
-            JOIN sales ON Ссылка = Филиал
-            GROUP BY Наименование
-            ORDER BY Количество_продаж DESC
-            LIMIT 10
+query = '''Select Номенклатура, Sum(Количество) As Количество from sales
+            JOIN products ON products.Ссылка = Номенклатура
+            GROUP BY Номенклатура
         '''
-st = time.time()
-query2 = '''With storages_sales As (
-                Select Ссылка, Наименование From branches Where (position('склад' in lower(КраткоеНаименование)) = 0)
-            )
-            Select Наименование, SUM(Количество) As Количество_продаж From storages_sales
-            JOIN sales ON Ссылка = Филиал
-            GROUP BY Наименование
-            ORDER BY Количество_продаж DESC
-            LIMIT 10
-        '''
-query3 ='''With storages_sales As (
-                Select Ссылка, Наименование From branches Where (position('склад' in lower(КраткоеНаименование)) > 0)
-            ), test As (
-                Select Наименование, Номенклатура, SUM(Количество)  As Количество_продаж From storages_sales
-                JOIN sales ON Ссылка = Филиал
-                GROUP BY Наименование, Номенклатура
-                ORDER BY Количество_продаж DESC
-            )
-            Select test.Наименование as Магазин, products.Наименование as Товар, 
-                Количество_продаж from test
-            JOIN products ON Ссылка = Номенклатура
-        '''
-# Если необходимо исключить из товара Доставку грузов, обработку грузов, доставку внутри региона, то просто добавить условие
-# Where (position('грузов' in lower(Наименование)) = 0 and position('доставка' in lower(Наименование)) = 0)
-# К Select * form to_select
-query4 = '''With products_without_delivery As (
-                Select * From products Where (position('грузов' in lower(Наименование)) = 0 and position('доставка' in lower(Наименование)) = 0)
-            )
-                Select products_without_delivery.Индекс, products_without_delivery.Наименование as Товар, branches.Наименование as Филиалы, Sum(Количество) As Количество from sales
-                JOIN products_without_delivery ON products_without_delivery.Ссылка = Номенклатура
-                JOIN branches ON branches.Ссылка = Филиал 
-                GROUP BY products_without_delivery.Индекс, Товар, Филиалы
-                ORDER BY Количество DESC
-            )
-            Select * from to_select 
-        '''
-# df = pd.read_sql_query(query1, conn2)
-# print(df)
-df = pd.read_sql_query(query3, conn2)
-print(df)
-et = time.time()
-print(et - st)
-# cursor = conn.cursor()
-# cursor.execute(query)
-# row = cursor.fetchall()
-# print(row)
-# cursor.close()
 
-# Execution time SQL: 0.9208459854125977 seconds
-# Execution time SQL: 0.9264271259307861 seconds
-# Execution time SQL: 0.9046401977539062 seconds
-# Execution time SQL: 0.9212141036987305 seconds
-# Execution time Pandas DF: 0.951648473739624 seconds
-# Execution time Pandas DF: 0.9107892513275146 seconds
-# Execution time Pandas DF: 0.9167971611022949 seconds
-# Execution time Pandas DF: 0.9107892513275146 seconds
+df = pd.read_sql_query(query, conn2)
+fig = px.histogram(df, x="Номенклатура", y="Количество")
+fig.show()
 
 def first_task():
-    pass
+    df = pd.read_sql_query(task2, conn2)
+    print(df)
+
+    def getDowInChar(i: float) -> str:
+        dow = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+        return dow[int(i)]
+
+    def getTime(i: float) -> str:
+        return f"{int(i)}:00"
+
+    to_show = pd.DataFrame({'Максимально продаж': [row[1][2] for row in df.iterrows()],
+                        'День недели': [getDowInChar(row[1][0]) for row in df.iterrows()],
+                        'Время': [getTime(row[1][1]) for row in df.iterrows()]})
+
+    fig = px.bar(to_show, x="День недели", y="Максимально продаж", text="Время")
+    fig.show()
+
+    fig = px.bar(to_show, x="Время", y="Максимально продаж", color="День недели")
+    fig.show()
 
 def second_task():
     pass
