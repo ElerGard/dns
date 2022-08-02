@@ -107,6 +107,21 @@ query24 = '''With to_select As (
             ORDER BY КоличествоПродаж DESC
             Limit 10
         '''
+query25 = '''With to_select As (
+                Select products.Индекс As ТоварИД, branches.Индекс as ФилиалИД, products.Наименование as Товар, 
+                        branches.Наименование as Филиалы, Sum(Количество) As Количество from sales
+                JOIN products ON products.Ссылка = Номенклатура
+                JOIN branches ON branches.Ссылка = Филиал 
+                GROUP BY ТоварИД, ФилиалИД, Товар, Филиалы
+                ORDER BY Количество DESC
+            ), to_select_city AS (
+                Select to_select.*, branches.Город from to_select 
+                JOIN branches ON ФилиалИД = Индекс
+            ) 
+            Select ТоварИД, ФилиалИД as ГородИД, Товар, cities.Наименование, Количество from to_select_city
+            JOIN cities ON Город = cities.Ссылка
+            LIMIT 10
+        '''
 cursor = conn.cursor()
 for query in queries:
     cursor.execute(query)
