@@ -1,11 +1,12 @@
 import pandas as pd
 import plotly.express as px
 import psycopg2
+import os
 from time import time
 from sqlalchemy import create_engine
 
 # Добавление файлов в подключенную бд
-def inser_csv_to_db(files: list, conn, conn_sqlalchemy) -> None:
+def insert_csv_to_db(files: list, conn, conn_sqlalchemy) -> None:
     
     # Запросы на создание таблиц
     # Первичные и вторичные ключи не настраивал так как не было чётких критериев на этот счёт
@@ -52,11 +53,15 @@ def inser_csv_to_db(files: list, conn, conn_sqlalchemy) -> None:
     # На моей системе при довольно большой нагрузке файл t_sales добавляется, в среднем, за 5 минут 
     for filename in files:
         st = time()
-        df = pd.read_csv(f't_{filename}.csv', sep=',')
-        df = df.rename(columns={'Unnamed: 0': 'Индекс'})
-        df.to_sql(filename, conn_sqlalchemy, if_exists='replace', index=False)
-        et = time()
-        print(f'Файл t_{filename}.csv добавлен в бд за: {et - st}')
+        if (os.path.exists(f't_{filename}.csv')):
+            df = pd.read_csv(f't_{filename}.csv', sep=',')
+            df = df.rename(columns={'Unnamed: 0': 'Индекс'})
+            df.to_sql(filename, conn_sqlalchemy, if_exists='replace', index=False)
+            et = time()
+            print(f'Файл t_{filename}.csv добавлен в бд за: {et - st}')
+        else:
+            print(f"Файл 't_{filename}.csv' не найден")
+            exit()
        
     print("Добавление файлов в БД завершено")
     return None
@@ -259,7 +264,7 @@ def main():
     
     filename= ['products', 'cities', 'branches', 'sales']
     
-    inser_csv_to_db(filename, conn, conn_sqlalchemy)
+    insert_csv_to_db(filename, conn, conn_sqlalchemy)
     first_part(conn_sqlalchemy)
     second_part(conn, conn_sqlalchemy)
     conn.close()
